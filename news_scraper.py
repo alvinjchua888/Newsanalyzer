@@ -123,28 +123,50 @@ class NewsScraper:
         articles = []
         
         if source not in self.rss_sources:
+            print(f"Source {source} not found in RSS sources")
             return articles
             
         try:
             rss_url = self.rss_sources[source]
-            response = requests.get(rss_url, headers=self.headers, timeout=10)
+            print(f"Fetching RSS feed from {source}: {rss_url}")
+            
+            response = requests.get(rss_url, headers=self.headers, timeout=15)
+            print(f"RSS response status for {source}: {response.status_code}")
             
             if response.status_code == 200:
                 feed = feedparser.parse(response.content)
+                print(f"Found {len(feed.entries)} entries in {source} RSS feed")
                 
-                for entry in feed.entries[:10]:  # Limit per source
+                for i, entry in enumerate(feed.entries[:10]):  # Limit per source
                     try:
+                        print(f"Processing RSS entry {i+1} from {source}: {entry.title[:50] if hasattr(entry, 'title') else 'No title'}...")
+                        
                         article_data = self._extract_article_content(entry.link, source)
-                        if article_data and self._is_relevant_article(article_data['content'], search_terms):
-                            articles.append(article_data)
+                        if article_data:
+                            # Use RSS metadata if article extraction didn't get it
+                            if hasattr(entry, 'title') and not article_data.get('title'):
+                                article_data['title'] = entry.title
+                            if hasattr(entry, 'published'):
+                                article_data['published_date'] = entry.published
+                                
+                            if self._is_relevant_article(article_data['content'], search_terms):
+                                articles.append(article_data)
+                                print(f"Added relevant article from {source}: {article_data['title'][:50]}...")
+                            else:
+                                print(f"Article not relevant to search terms: {search_terms}")
+                        else:
+                            print(f"Failed to extract content from RSS entry: {entry.link}")
                             
                     except Exception as e:
-                        print(f"Error processing RSS entry: {str(e)}")
+                        print(f"Error processing RSS entry {i+1} from {source}: {str(e)}")
                         continue
+            else:
+                print(f"Failed to fetch RSS feed from {source}. Status: {response.status_code}")
                         
         except Exception as e:
             print(f"Error fetching RSS from {source}: {str(e)}")
             
+        print(f"RSS scraping from {source} returned {len(articles)} relevant articles")
         return articles
     
     def _extract_real_url(self, google_news_url: str) -> str:
@@ -244,16 +266,23 @@ class NewsScraper:
         """
         Check if article content is relevant to our search terms
         """
-        if not content or len(content) < 100:
+        if not content or len(content) < 50:
+            print(f"Article too short or empty (length: {len(content) if content else 0})")
             return False
             
         content_lower = content.lower()
         
-        # Must contain at least one search term
+        # Count how many search terms are found
         relevance_score = 0
+        found_terms = []
+        
         for term in search_terms:
-            if term.lower() in content_lower:
+            term_lower = term.lower().strip()
+            if term_lower and term_lower in content_lower:
                 relevance_score += 1
+                found_terms.append(term)
+        
+        print(f"Relevance check: {relevance_score}/{len(search_terms)} terms found: {found_terms}")
         
         # Consider article relevant if it contains any search term
         return relevance_score > 0
