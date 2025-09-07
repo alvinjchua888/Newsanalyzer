@@ -10,8 +10,8 @@ from utils import export_to_csv, format_date, clean_text
 
 # Page configuration
 st.set_page_config(
-    page_title="Philippine Peso Forex News Analyzer",
-    page_icon="💱",
+    page_title="AI News Analyzer",
+    page_icon="📰",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -35,8 +35,8 @@ def init_components():
 scraper, analyzer, processor = init_components()
 
 # Header
-st.title("💱 Philippine Peso Forex News Analyzer")
-st.markdown("Real-time analysis of Philippine peso foreign exchange news using AI-powered insights")
+st.title("📰 AI News Analyzer")
+st.markdown("Real-time analysis of news articles on any topic using AI-powered insights")
 
 # Sidebar controls
 with st.sidebar:
@@ -62,30 +62,34 @@ with st.sidebar:
     st.subheader("News Sources")
     selected_sources = st.multiselect(
         "Select sources:",
-        options=["Reuters", "Bloomberg", "CNN Philippines", "Rappler", "Inquirer", "Manila Bulletin"],
-        default=["Reuters", "Bloomberg", "CNN Philippines"]
+        options=["BBC News", "Reuters", "CNN", "AP News", "Yahoo News", "Google News"],
+        default=["BBC News", "Reuters", "CNN"]
     )
     
-    # Search keywords
-    st.subheader("Keywords")
-    keywords = st.text_input(
-        "Additional keywords (comma-separated):",
-        value="Philippine peso, PHP, exchange rate, forex, currency"
+    # Search topic
+    st.subheader("Search Topic")
+    topic = st.text_input(
+        "Enter the topic you want to analyze:",
+        value="artificial intelligence, technology",
+        help="Enter keywords related to the topic you want to search for"
     )
     
     # Action buttons
     st.subheader("Actions")
     if st.button("🔍 Scrape & Analyze News", type="primary"):
-        with st.spinner("Scraping news articles..."):
-            try:
-                # Scrape articles
-                search_terms = [term.strip() for term in keywords.split(",")]
-                articles = scraper.scrape_news(
-                    search_terms=search_terms,
-                    sources=selected_sources,
-                    start_date=start_date,
-                    end_date=end_date
-                )
+        if not topic.strip():
+            st.error("Please enter a topic to search for.")
+        else:
+            with st.spinner("Scraping news articles..."):
+                try:
+                    # Scrape articles
+                    search_terms = [term.strip() for term in topic.split(",")]
+                    articles = scraper.scrape_news(
+                        search_terms=search_terms,
+                        sources=selected_sources,
+                        start_date=start_date,
+                        end_date=end_date
+                    )
                 st.session_state.articles = articles
                 
                 if articles:
@@ -128,14 +132,14 @@ with st.sidebar:
 
 # Main content area
 if not st.session_state.analyzed_articles:
-    st.info("👆 Use the sidebar to scrape and analyze Philippine peso forex news")
+    st.info("👆 Use the sidebar to scrape and analyze news on any topic")
     
     # Show sample instructions
     with st.expander("ℹ️ How to use this application"):
         st.markdown("""
         1. **Set Date Range**: Choose the period for news analysis
         2. **Select Sources**: Pick reliable news sources
-        3. **Add Keywords**: Customize search terms (default includes PHP, peso, etc.)
+        3. **Enter Topic**: Type in the subject you want to analyze (e.g., "climate change", "artificial intelligence", "cryptocurrency")
         4. **Scrape & Analyze**: Click the button to fetch and analyze news
         5. **Review Results**: Explore insights in the dashboard below
         6. **Export Data**: Download results as CSV for further analysis
@@ -162,8 +166,8 @@ else:
         neutral_count = sentiments.count('neutral')
         st.metric("Neutral Sentiment", neutral_count)
     
-    # Overall market sentiment
-    st.subheader("🎯 Overall Market Sentiment")
+    # Overall topic analysis
+    st.subheader("🎯 Overall Topic Analysis")
     try:
         overall_analysis = analyzer.generate_overall_analysis(st.session_state.analyzed_articles)
         st.info(overall_analysis)
@@ -243,4 +247,4 @@ else:
 
 # Footer
 st.markdown("---")
-st.markdown("Built with ❤️ using Streamlit and OpenAI GPT-5")
+st.markdown("Built with ❤️ using Streamlit and OpenAI GPT-5 | Analyze any news topic with AI-powered insights")
