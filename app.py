@@ -1,3 +1,20 @@
+"""
+AI News Analyzer - Main Streamlit Application
+
+This module provides the main web interface for the AI News Analyzer using Streamlit.
+It orchestrates news scraping, AI analysis, and data visualization in an interactive
+dashboard that allows users to analyze news sentiment and trends on any topic.
+
+The application features:
+- Multi-source news scraping from RSS feeds and Google News
+- AI-powered sentiment analysis and insight extraction using OpenAI GPT
+- Interactive filtering and exploration of results
+- Export capabilities for further analysis
+- Real-time processing with progress indicators
+
+Author: AI News Analyzer Team
+"""
+
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
@@ -8,7 +25,7 @@ from llm_analyzer import LLMAnalyzer
 from data_processor import DataProcessor
 from utils import export_to_csv, format_date, clean_text
 
-# Page configuration
+# Page configuration - must be first Streamlit command
 st.set_page_config(
     page_title="AI News Analyzer",
     page_icon="📰",
@@ -16,22 +33,37 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Initialize session state
+# Initialize session state for persistent data across user interactions
 if 'articles' not in st.session_state:
-    st.session_state.articles = []
+    st.session_state.articles = []  # Raw scraped articles
 if 'analyzed_articles' not in st.session_state:
-    st.session_state.analyzed_articles = []
+    st.session_state.analyzed_articles = []  # Articles with AI analysis
 if 'last_update' not in st.session_state:
-    st.session_state.last_update = None
+    st.session_state.last_update = None  # Timestamp of last analysis
 
-# Initialize components
+# Initialize components with caching for performance
 @st.cache_resource
 def init_components():
+    """
+    Initialize and cache the main application components.
+    
+    This function creates instances of the core processing components
+    and caches them to avoid reinitialization on every user interaction.
+    
+    Returns:
+        Tuple[NewsScraper, LLMAnalyzer, DataProcessor]: Initialized components
+        
+    Note:
+        - Uses Streamlit's @st.cache_resource decorator for persistence
+        - Components are shared across all user sessions
+        - Cached instances remain until app restart
+    """
     scraper = NewsScraper()
     analyzer = LLMAnalyzer()
     processor = DataProcessor()
     return scraper, analyzer, processor
 
+# Get cached component instances
 scraper, analyzer, processor = init_components()
 
 # Header
