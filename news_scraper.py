@@ -15,9 +15,9 @@ class NewsScraper:
         }
         self.rss_sources = {
             'BBC News': 'http://feeds.bbci.co.uk/news/rss.xml',
-            'Reuters': 'https://www.reutersagency.com/feed/?best-topics=business-finance&post_type=best',
+            'Reuters': 'https://feeds.reuters.com/reuters/topNews',
             'CNN': 'http://rss.cnn.com/rss/edition.rss',
-            'AP News': 'https://rsshub.app/ap/topics/apf-topnews',
+            'AP News': 'https://feeds.apnews.com/apnews/topnews',
             'Yahoo News': 'https://www.yahoo.com/news/rss',
             'Google News': 'https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en'
         }
@@ -69,26 +69,50 @@ class NewsScraper:
             encoded_query = urllib.parse.quote_plus(search_query)
             google_news_url = f"https://news.google.com/rss/search?q={encoded_query}&hl=en-US&gl=US&ceid=US:en"
             
-            response = requests.get(google_news_url, headers=self.headers, timeout=10)
+            print(f"Searching Google News for: {search_query}")
+            print(f"URL: {google_news_url}")
+            
+            response = requests.get(google_news_url, headers=self.headers, timeout=15)
+            print(f"Google News response status: {response.status_code}")
+            
             if response.status_code == 200:
                 feed = feedparser.parse(response.content)
+                print(f"Found {len(feed.entries)} entries in Google News feed")
                 
-                for entry in feed.entries[:max_articles]:
+                for i, entry in enumerate(feed.entries[:max_articles]):
                     try:
-                        # Extract the actual article URL from Google News redirect
-                        article_url = self._extract_real_url(entry.link)
+                        print(f"Processing entry {i+1}: {entry.title[:100] if hasattr(entry, 'title') else 'No title'}")
+                        
+                        # Try to use the original URL directly first
+                        article_url = entry.link
+                        if 'news.google.com' in article_url:
+                            article_url = self._extract_real_url(entry.link)
+                        
                         if article_url:
+                            print(f"Extracting content from: {article_url[:100]}...")
                             article_data = self._extract_article_content(article_url, 'Google News')
                             if article_data:
+                                # Use the RSS entry data if available
+                                if hasattr(entry, 'title') and not article_data.get('title'):
+                                    article_data['title'] = entry.title
+                                if hasattr(entry, 'published'):
+                                    article_data['published_date'] = entry.published
+                                    
                                 articles.append(article_data)
+                                print(f"Successfully added article: {article_data['title'][:50]}...")
+                            else:
+                                print(f"Failed to extract content from {article_url}")
                                 
                     except Exception as e:
-                        print(f"Error processing Google News entry: {str(e)}")
+                        print(f"Error processing Google News entry {i+1}: {str(e)}")
                         continue
+            else:
+                print(f"Failed to fetch Google News feed. Status: {response.status_code}")
                         
         except Exception as e:
             print(f"Error searching Google News: {str(e)}")
             
+        print(f"Google News search returned {len(articles)} articles")
         return articles
     
     def _scrape_rss_source(self, source: str, search_terms: List[str], 
@@ -128,20 +152,34 @@ class NewsScraper:
         Extract the real article URL from Google News redirect URL
         """
         try:
-            # Google News URLs often contain the real URL in the query parameters
+            if not google_news_url:
+                return None
+                
+            # If it's already a direct URL (not a Google redirect), return as is
+            if not 'news.google.com' in google_news_url:
+                return google_news_url
+                
+            # Try to follow the redirect to get the real URL
+            try:
+                response = requests.head(google_news_url, headers=self.headers, timeout=10, allow_redirects=True)
+                if response.url and response.url != google_news_url:
+                    return response.url
+            except:
+                pass
+                
+            # Fallback: try to extract URL from query parameters
             if 'url=' in google_news_url:
-                # Extract URL parameter
                 url_start = google_news_url.find('url=') + 4
                 url_end = google_news_url.find('&', url_start)
                 if url_end == -1:
                     url_end = len(google_news_url)
                 real_url = urllib.parse.unquote(google_news_url[url_start:url_end])
                 return real_url
-            else:
-                # If it's already a direct URL, return as is
-                return google_news_url
+                
+            return google_news_url
+            
         except Exception as e:
-            print(f"Error extracting real URL: {str(e)}")
+            print(f"Error extracting real URL from {google_news_url}: {str(e)}")
             return google_news_url
     
     def _extract_article_content(self, url: str, source: str) -> Dict[str, Any]:
@@ -149,16 +187,27 @@ class NewsScraper:
         Extract content from a single article URL using trafilatura
         """
         try:
-            # Download the webpage
-            downloaded = trafilatura.fetch_url(url)
+            if not url or not url.startswith(('http://', 'https://')):
+                print(f"Invalid URL: {url}")
+                return None
+                
+            print(f"Downloading content from: {url}")
+            
+            # Download the webpage with better settings
+            downloaded = trafilatura.fetch_url(url, config=trafilatura.settings.use_config())
             
             if not downloaded:
+                print(f"Failed to download content from {url}")
                 return None
             
-            # Extract text content
-            text = trafilatura.extract(downloaded)
+            # Extract text content with better settings
+            text = trafilatura.extract(downloaded, 
+                                    include_comments=False,
+                                    include_tables=True,
+                                    include_formatting=False)
             
-            if not text:
+            if not text or len(text.strip()) < 100:
+                print(f"Insufficient content extracted from {url} (length: {len(text) if text else 0})")
                 return None
             
             # Extract metadata
@@ -174,6 +223,7 @@ class NewsScraper:
                 'author': metadata.author if metadata and metadata.author else 'Unknown'
             }
             
+            print(f"Successfully extracted article: {article_data['title'][:50]}... ({len(text)} chars)")
             return article_data
             
         except Exception as e:
