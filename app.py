@@ -62,15 +62,15 @@ with st.sidebar:
     st.subheader("News Sources")
     selected_sources = st.multiselect(
         "Select sources:",
-        options=["BBC News", "Reuters", "CNN", "AP News", "Yahoo News", "Google News"],
-        default=["BBC News", "Reuters", "CNN"]
+        options=["Google News", "BBC News", "Reuters", "CNN", "AP News", "Yahoo News", "TechCrunch", "The Verge", "Ars Technica", "Wired", "Engadget"],
+        default=["Google News", "TechCrunch", "The Verge"]
     )
     
     # Search topic
     st.subheader("Search Topic")
     topic = st.text_input(
         "Enter the topic you want to analyze:",
-        value="artificial intelligence, technology",
+        value="iPhone",
         help="Enter keywords related to the topic you want to search for"
     )
     

@@ -21,6 +21,15 @@ class NewsScraper:
             'Yahoo News': 'https://www.yahoo.com/news/rss',
             'Google News': 'https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en'
         }
+        
+        # Technology-focused RSS sources for better tech coverage
+        self.tech_rss_sources = {
+            'TechCrunch': 'https://techcrunch.com/feed/',
+            'The Verge': 'https://www.theverge.com/rss/index.xml',
+            'Ars Technica': 'http://feeds.arstechnica.com/arstechnica/index',
+            'Wired': 'https://www.wired.com/feed/rss',
+            'Engadget': 'https://www.engadget.com/rss.xml'
+        }
     
     def scrape_news(self, search_terms: List[str], sources: List[str], 
                    start_date: datetime, end_date: datetime, max_articles: int = 20) -> List[Dict[str, Any]]:
@@ -39,11 +48,16 @@ class NewsScraper:
         
         # Then, search through RSS feeds
         for source in sources:
-            if source not in self.rss_sources:
-                continue
-                
             try:
-                source_articles = self._scrape_rss_source(source, search_terms, start_date, end_date)
+                # Check if it's a regular RSS source or tech source
+                if source in self.rss_sources:
+                    source_articles = self._scrape_rss_source(source, search_terms, start_date, end_date)
+                elif source in self.tech_rss_sources:
+                    source_articles = self._scrape_tech_rss_source(source, self.tech_rss_sources[source], search_terms, start_date, end_date)
+                else:
+                    print(f"Unknown source: {source}")
+                    continue
+                    
                 articles.extend(source_articles)
                 time.sleep(1)  # Be respectful to servers
                 
@@ -82,27 +96,36 @@ class NewsScraper:
                 
                 for i, entry in enumerate(feed.entries[:max_articles]):
                     try:
-                        print(f"Processing entry {i+1}: {entry.title[:100] if hasattr(entry, 'title') else 'No title'}")
+                        title = entry.title if hasattr(entry, 'title') else 'No title'
+                        print(f"Processing entry {i+1}: {title[:100]}")
                         
-                        # Try to use the original URL directly first
-                        article_url = entry.link
-                        if 'news.google.com' in article_url:
-                            article_url = self._extract_real_url(entry.link)
+                        # Quick relevance check on title first
+                        title_relevant = any(term.lower() in title.lower() for term in search_terms if term.strip())
                         
-                        if article_url:
-                            print(f"Extracting content from: {article_url[:100]}...")
-                            article_data = self._extract_article_content(article_url, 'Google News')
-                            if article_data:
-                                # Use the RSS entry data if available
-                                if hasattr(entry, 'title') and not article_data.get('title'):
-                                    article_data['title'] = entry.title
-                                if hasattr(entry, 'published'):
-                                    article_data['published_date'] = entry.published
-                                    
-                                articles.append(article_data)
-                                print(f"Successfully added article: {article_data['title'][:50]}...")
-                            else:
-                                print(f"Failed to extract content from {article_url}")
+                        if title_relevant:
+                            print(f"Title seems relevant, extracting full content...")
+                            
+                            # Try to use the original URL directly first
+                            article_url = entry.link
+                            if 'news.google.com' in article_url:
+                                article_url = self._extract_real_url(entry.link)
+                            
+                            if article_url:
+                                print(f"Extracting content from: {article_url[:100]}...")
+                                article_data = self._extract_article_content(article_url, 'Google News')
+                                if article_data:
+                                    # Use the RSS entry data if available
+                                    if hasattr(entry, 'title') and not article_data.get('title'):
+                                        article_data['title'] = entry.title
+                                    if hasattr(entry, 'published'):
+                                        article_data['published_date'] = entry.published
+                                        
+                                    articles.append(article_data)
+                                    print(f"Successfully added article: {article_data['title'][:50]}...")
+                                else:
+                                    print(f"Failed to extract content from {article_url}")
+                        else:
+                            print(f"Title not relevant to search terms, skipping content extraction")
                                 
                     except Exception as e:
                         print(f"Error processing Google News entry {i+1}: {str(e)}")
@@ -314,3 +337,73 @@ class NewsScraper:
                 seen_titles.add(title)
         
         return unique_articles
+    
+    def _scrape_tech_rss_source(self, source_name: str, source_url: str, search_terms: List[str], 
+                               start_date: datetime, end_date: datetime) -> List[Dict[str, Any]]:
+        """
+        Scrape articles from technology-focused RSS feeds
+        """
+        articles = []
+        
+        try:
+            print(f"Fetching tech RSS feed from {source_name}: {source_url}")
+            
+            response = requests.get(source_url, headers=self.headers, timeout=15)
+            print(f"Tech RSS response status for {source_name}: {response.status_code}")
+            
+            if response.status_code == 200:
+                feed = feedparser.parse(response.content)
+                print(f"Found {len(feed.entries)} entries in {source_name} RSS feed")
+                
+                for i, entry in enumerate(feed.entries[:15]):  # Check more entries from tech sources
+                    try:
+                        title = entry.title if hasattr(entry, 'title') else 'No title'
+                        print(f"Processing tech entry {i+1} from {source_name}: {title[:70]}...")
+                        
+                        # Quick relevance check on title first
+                        title_relevant = any(term.lower() in title.lower() for term in search_terms if term.strip())
+                        
+                        if title_relevant:
+                            print(f"Title relevant! Extracting content...")
+                            article_data = self._extract_article_content(entry.link, source_name)
+                            if article_data:
+                                # Use RSS metadata if available
+                                if hasattr(entry, 'title') and not article_data.get('title'):
+                                    article_data['title'] = entry.title
+                                if hasattr(entry, 'published'):
+                                    article_data['published_date'] = entry.published
+                                    
+                                articles.append(article_data)
+                                print(f"Added tech article: {article_data['title'][:50]}...")
+                            else:
+                                print(f"Failed to extract content from tech article: {entry.link}")
+                        else:
+                            # Also check description/summary for relevance
+                            description = getattr(entry, 'summary', '') or getattr(entry, 'description', '')
+                            desc_relevant = any(term.lower() in description.lower() for term in search_terms if term.strip())
+                            
+                            if desc_relevant:
+                                print(f"Description relevant! Extracting content...")
+                                article_data = self._extract_article_content(entry.link, source_name)
+                                if article_data and self._is_relevant_article(article_data['content'], search_terms):
+                                    if hasattr(entry, 'title') and not article_data.get('title'):
+                                        article_data['title'] = entry.title
+                                    if hasattr(entry, 'published'):
+                                        article_data['published_date'] = entry.published
+                                        
+                                    articles.append(article_data)
+                                    print(f"Added tech article from description match: {article_data['title'][:50]}...")
+                            else:
+                                print(f"Not relevant to search terms, skipping")
+                            
+                    except Exception as e:
+                        print(f"Error processing tech entry {i+1} from {source_name}: {str(e)}")
+                        continue
+            else:
+                print(f"Failed to fetch tech RSS feed from {source_name}. Status: {response.status_code}")
+                        
+        except Exception as e:
+            print(f"Error fetching tech RSS from {source_name}: {str(e)}")
+            
+        print(f"Tech RSS scraping from {source_name} returned {len(articles)} relevant articles")
+        return articles
