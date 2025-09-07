@@ -102,7 +102,7 @@ class DataProcessor:
                 
                 # AI analysis results
                 'sentiment': article.get('sentiment', 'neutral'),
-                'confidence_score': article.get('confidence_score', 0.0),
+                'confidence_score': float(article.get('confidence_score', 0.0)),
                 'summary': article.get('summary', ''),
                 'market_impact': article.get('market_impact', 'unknown'),
                 'key_insights_count': len(article.get('key_insights', [])),
