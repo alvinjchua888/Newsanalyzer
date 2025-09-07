@@ -90,35 +90,35 @@ with st.sidebar:
                         start_date=start_date,
                         end_date=end_date
                     )
-                st.session_state.articles = articles
+                    st.session_state.articles = articles
                 
-                if articles:
-                    st.success(f"Found {len(articles)} articles!")
-                    
-                    # Analyze articles
-                    with st.spinner("Analyzing articles with AI..."):
-                        analyzed_articles = []
-                        progress_bar = st.progress(0)
+                    if articles:
+                        st.success(f"Found {len(articles)} articles!")
                         
-                        for i, article in enumerate(articles):
-                            try:
-                                analysis = analyzer.analyze_article(article)
-                                analyzed_articles.append({
-                                    **article,
-                                    **analysis
-                                })
-                                progress_bar.progress((i + 1) / len(articles))
-                            except Exception as e:
-                                st.error(f"Error analyzing article: {str(e)}")
+                        # Analyze articles
+                        with st.spinner("Analyzing articles with AI..."):
+                            analyzed_articles = []
+                            progress_bar = st.progress(0)
+                            
+                            for i, article in enumerate(articles):
+                                try:
+                                    analysis = analyzer.analyze_article(article)
+                                    analyzed_articles.append({
+                                        **article,
+                                        **analysis
+                                    })
+                                    progress_bar.progress((i + 1) / len(articles))
+                                except Exception as e:
+                                    st.error(f"Error analyzing article: {str(e)}")
+                            
+                            st.session_state.analyzed_articles = analyzed_articles
+                            st.session_state.last_update = datetime.now()
+                            st.success("Analysis complete!")
+                    else:
+                        st.warning("No articles found for the selected criteria.")
                         
-                        st.session_state.analyzed_articles = analyzed_articles
-                        st.session_state.last_update = datetime.now()
-                        st.success("Analysis complete!")
-                else:
-                    st.warning("No articles found for the selected criteria.")
-                    
-            except Exception as e:
-                st.error(f"Error during scraping: {str(e)}")
+                except Exception as e:
+                    st.error(f"Error during scraping: {str(e)}")
     
     if st.session_state.analyzed_articles:
         if st.button("📥 Export Results"):
