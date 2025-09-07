@@ -1,10 +1,59 @@
+"""
+LLM Analyzer Module
+
+This module provides AI-powered analysis capabilities using OpenAI's GPT models.
+It handles sentiment analysis, content summarization, key insight extraction,
+and market impact assessment for news articles.
+
+The module uses structured prompting and JSON responses to ensure consistent
+and reliable analysis results across different types of content.
+
+Author: AI News Analyzer Team
+"""
+
 import json
 import os
 from openai import OpenAI
 from typing import Dict, Any, List
 
 class LLMAnalyzer:
+    """
+    AI-powered news article analyzer using OpenAI's GPT models.
+    
+    This class provides comprehensive analysis capabilities including:
+    - Sentiment analysis with confidence scoring
+    - Article summarization 
+    - Key insights extraction
+    - Market impact assessment
+    - Overall topic analysis across multiple articles
+    
+    The analyzer uses GPT-4o for optimal balance of performance and cost,
+    with structured JSON responses to ensure consistent output formatting.
+    
+    Attributes:
+        model (str): OpenAI model identifier ("gpt-4o")
+        client (OpenAI): Configured OpenAI API client
+        
+    Raises:
+        ValueError: If OPENAI_API_KEY environment variable is not set
+        
+    Example:
+        >>> analyzer = LLMAnalyzer()
+        >>> article = {'title': 'AI Breakthrough', 'content': 'Article content...'}
+        >>> result = analyzer.analyze_article(article)
+        >>> print(f"Sentiment: {result['sentiment']}")
+    """
+    
     def __init__(self):
+        """
+        Initialize the LLM analyzer with OpenAI client and model configuration.
+        
+        Sets up the OpenAI client using the API key from environment variables.
+        Uses GPT-4o model for optimal balance of quality, speed, and cost.
+        
+        Raises:
+            ValueError: If OPENAI_API_KEY environment variable is not set
+        """
         # Using gpt-4o for better stability and compatibility
         self.model = "gpt-4o"
         api_key = os.getenv("OPENAI_API_KEY")
@@ -13,13 +62,45 @@ class LLMAnalyzer:
         
         self.client = OpenAI(api_key=api_key)
     
+    
     def analyze_article(self, article: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Analyze a single news article for insights on any topic
+        Perform comprehensive AI analysis of a single news article.
+        
+        This method orchestrates multiple AI analysis components to provide
+        a complete assessment of the article including sentiment, summary,
+        insights, and market impact.
+        
+        Args:
+            article (Dict[str, Any]): Article dictionary containing:
+                - content (str): Full article text
+                - title (str): Article headline
+                - Other metadata (optional)
+                
+        Returns:
+            Dict[str, Any]: Analysis results containing:
+                - sentiment (str): "positive", "negative", or "neutral"
+                - confidence_score (float): Confidence level 0.0-1.0
+                - summary (str): Concise 2-3 sentence summary
+                - key_insights (List[str]): List of important insights
+                - market_impact (str): Impact level ("high", "medium", "low", "minimal")
+                
+        Note:
+            If analysis fails, returns default values with error message in summary.
+            Content is truncated to optimize API usage and response time.
+            
+        Example:
+            >>> article = {
+            ...     'title': 'Major AI Breakthrough Announced',
+            ...     'content': 'Researchers have developed...'
+            ... }
+            >>> analysis = analyzer.analyze_article(article)
+            >>> print(f"Sentiment: {analysis['sentiment']} ({analysis['confidence_score']:.2f})")
         """
         content = article.get('content', '')
         title = article.get('title', '')
         
+        # Handle missing or empty content
         if not content:
             return {
                 'sentiment': 'neutral',
@@ -30,16 +111,10 @@ class LLMAnalyzer:
             }
         
         try:
-            # Generate summary
+            # Generate comprehensive analysis components
             summary = self._generate_summary(title, content)
-            
-            # Analyze sentiment
             sentiment_analysis = self._analyze_sentiment(content)
-            
-            # Extract key insights
             key_insights = self._extract_key_insights(content)
-            
-            # Assess market impact
             market_impact = self._assess_market_impact(content)
             
             return {
@@ -51,6 +126,7 @@ class LLMAnalyzer:
             }
             
         except Exception as e:
+            # Graceful fallback for API errors
             return {
                 'sentiment': 'neutral',
                 'confidence_score': 0.0,
@@ -59,9 +135,25 @@ class LLMAnalyzer:
                 'market_impact': 'unknown'
             }
     
+    
     def _generate_summary(self, title: str, content: str) -> str:
         """
-        Generate a concise summary of the article focusing on key aspects
+        Generate a concise AI summary of the article focusing on key aspects.
+        
+        Uses GPT to create a 2-3 sentence summary that captures the most
+        important points, main events, and implications of the article.
+        
+        Args:
+            title (str): Article headline for context
+            content (str): Article content (truncated to 2000 chars for efficiency)
+            
+        Returns:
+            str: Concise summary or error message if generation fails
+            
+        Note:
+            - Content is truncated to first 2000 characters to optimize API usage
+            - Uses low temperature (0.3) for consistent, focused summaries
+            - Limits output to 150 tokens to ensure brevity
         """
         prompt = f"""
         Please provide a concise summary of this news article. 
@@ -78,7 +170,7 @@ class LLMAnalyzer:
                 model=self.model,
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=150,
-                temperature=0.3
+                temperature=0.3  # Low temperature for consistency
             )
             return response.choices[0].message.content.strip()
         except Exception as e:
@@ -86,7 +178,25 @@ class LLMAnalyzer:
     
     def _analyze_sentiment(self, content: str) -> Dict[str, Any]:
         """
-        Analyze sentiment of the news article for the topic being discussed
+        Analyze sentiment of the news article with confidence scoring.
+        
+        Performs comprehensive sentiment analysis considering overall tone,
+        outlook, implications, and impact on stakeholders. Returns structured
+        results with confidence scoring and reasoning.
+        
+        Args:
+            content (str): Article content (truncated to 2000 chars for efficiency)
+            
+        Returns:
+            Dict[str, Any]: Sentiment analysis containing:
+                - sentiment (str): "positive", "negative", or "neutral"
+                - confidence (float): Confidence score 0.0-1.0
+                - reasoning (str): Brief explanation of the sentiment assessment
+                
+        Note:
+            - Uses JSON mode for structured output
+            - Low temperature (0.2) for consistent classification
+            - Considers multiple factors beyond simple positive/negative words
         """
         prompt = f"""
         Analyze the sentiment of this news article. Consider factors like:
@@ -112,13 +222,13 @@ class LLMAnalyzer:
                     {"role": "user", "content": prompt}
                 ],
                 response_format={"type": "json_object"},
-                temperature=0.2
+                temperature=0.2  # Very low temperature for consistency
             )
             
             result = json.loads(response.choices[0].message.content)
             return {
                 'sentiment': result.get('sentiment', 'neutral'),
-                'confidence': max(0.0, min(1.0, result.get('confidence', 0.5))),
+                'confidence': max(0.0, min(1.0, result.get('confidence', 0.5))),  # Clamp to valid range
                 'reasoning': result.get('reasoning', '')
             }
         except Exception as e:
@@ -128,9 +238,31 @@ class LLMAnalyzer:
                 'reasoning': f'Error in sentiment analysis: {str(e)}'
             }
     
+    
     def _extract_key_insights(self, content: str) -> List[str]:
         """
-        Extract key insights from the article relevant to the topic being discussed
+        Extract key insights from the article relevant to the topic being discussed.
+        
+        Uses AI to identify and extract 3-5 most valuable insights that would
+        be useful for understanding the main topic, including specific facts,
+        developments, trends, and expert opinions.
+        
+        Args:
+            content (str): Article content (truncated to 2000 chars for efficiency)
+            
+        Returns:
+            List[str]: List of key insights (3-5 items), empty list or error message if extraction fails
+            
+        Focus Areas:
+            - Specific facts or data mentioned
+            - Important developments or announcements  
+            - Driving factors and trends
+            - Analysis points and expert opinions
+            
+        Note:
+            - Uses JSON mode for structured output
+            - Moderate temperature (0.3) for creative but focused insight extraction
+            - Returns error message in list if API call fails
         """
         prompt = f"""
         Extract 3-5 key insights from this article that would be valuable for understanding the main topic.
@@ -157,7 +289,7 @@ class LLMAnalyzer:
                     {"role": "user", "content": prompt}
                 ],
                 response_format={"type": "json_object"},
-                temperature=0.3
+                temperature=0.3  # Moderate temperature for creative insights
             )
             
             result = json.loads(response.choices[0].message.content)
@@ -167,7 +299,28 @@ class LLMAnalyzer:
     
     def _assess_market_impact(self, content: str) -> str:
         """
-        Assess the potential impact of the news on the topic or relevant stakeholders
+        Assess the potential market or industry impact of the news.
+        
+        Analyzes the article to determine how significantly the news might
+        affect relevant industries, markets, or stakeholders. Provides
+        structured impact classification.
+        
+        Args:
+            content (str): Article content (truncated to 1500 chars for efficiency)
+            
+        Returns:
+            str: Impact level ("high", "medium", "low", "minimal") or "unknown" if assessment fails
+            
+        Impact Levels:
+            - high: Major industry disruption, significant market effects
+            - medium: Notable impact on specific sectors or companies
+            - low: Minor influence, limited scope
+            - minimal: Little to no market impact expected
+            
+        Note:
+            - Uses JSON mode for structured output
+            - Very low temperature (0.2) for consistent classification
+            - Shorter content limit (1500 chars) as impact can often be determined from key points
         """
         prompt = f"""
         Assess the potential impact of this news on the relevant industry, market, or stakeholders.
@@ -190,7 +343,7 @@ class LLMAnalyzer:
                     {"role": "user", "content": prompt}
                 ],
                 response_format={"type": "json_object"},
-                temperature=0.2
+                temperature=0.2  # Low temperature for consistent impact assessment
             )
             
             result = json.loads(response.choices[0].message.content)
@@ -198,14 +351,47 @@ class LLMAnalyzer:
         except Exception as e:
             return 'unknown'
     
+    
     def generate_overall_analysis(self, analyzed_articles: List[Dict[str, Any]]) -> str:
         """
-        Generate an overall topic analysis based on all analyzed articles
+        Generate a comprehensive overall topic analysis based on multiple analyzed articles.
+        
+        This method synthesizes insights from all analyzed articles to provide
+        a high-level assessment of the topic, including sentiment trends,
+        key driving factors, outlook, and strategic implications.
+        
+        Args:
+            analyzed_articles (List[Dict[str, Any]]): List of articles with analysis results
+                Each article should contain sentiment, summary, and other analysis data
+                
+        Returns:
+            str: Multi-paragraph comprehensive analysis covering:
+                - Overall sentiment and trend direction
+                - Key factors and developments driving the narrative
+                - Outlook and potential implications  
+                - Key insights and takeaways
+                Returns error message if analysis fails
+                
+        Analysis Structure:
+            1. Sentiment distribution and trends
+            2. Key developments and driving factors
+            3. Future outlook and implications
+            4. Strategic insights and recommendations
+            
+        Note:
+            - Uses first 5 article summaries to maintain prompt length limits
+            - Moderate temperature (0.4) for comprehensive but coherent analysis
+            - Handles empty article list gracefully
+            
+        Example:
+            >>> articles = [article1, article2, article3]  # With analysis results
+            >>> overall = analyzer.generate_overall_analysis(articles)
+            >>> print(overall)  # Multi-paragraph topic assessment
         """
         if not analyzed_articles:
             return "No articles available for analysis."
         
-        # Prepare summary data
+        # Prepare summary statistics for analysis
         sentiments = [article.get('sentiment', 'neutral') for article in analyzed_articles]
         summaries = [article.get('summary', '') for article in analyzed_articles if article.get('summary')]
         
@@ -244,7 +430,7 @@ class LLMAnalyzer:
                     {"role": "user", "content": prompt}
                 ],
                 max_tokens=500,
-                temperature=0.4
+                temperature=0.4  # Moderate temperature for comprehensive analysis
             )
             return response.choices[0].message.content.strip()
         except Exception as e:
