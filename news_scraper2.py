@@ -6,6 +6,8 @@ and Google News search. It handles content extraction, deduplication, and releva
 filtering to provide high-quality news data for analysis.
 
 Author: AI News Analyzer Team
+
+
 """
 
 import requests
