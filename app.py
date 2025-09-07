@@ -66,56 +66,63 @@ def init_components():
 # Get cached component instances
 scraper, analyzer, processor = init_components()
 
-# Header
+# Main application header
 st.title("📰 AI News Analyzer")
 st.markdown("Real-time analysis of news articles on any topic using AI-powered insights")
 
-# Sidebar controls
+# ========================================
+# SIDEBAR - User Controls and Configuration
+# ========================================
+
 with st.sidebar:
     st.header("🔧 Controls")
     
-    # Date range selection
+    # Date range selection for article filtering
     st.subheader("Date Range")
     col1, col2 = st.columns(2)
     with col1:
         start_date = st.date_input(
             "From",
-            value=datetime.now() - timedelta(days=7),
-            max_value=datetime.now()
+            value=datetime.now() - timedelta(days=7),  # Default to last 7 days
+            max_value=datetime.now()  # Cannot select future dates
         )
     with col2:
         end_date = st.date_input(
             "To",
-            value=datetime.now(),
-            max_value=datetime.now()
+            value=datetime.now(),  # Default to today
+            max_value=datetime.now()  # Cannot select future dates
         )
     
-    # News sources
+    # News source selection - mix of general and tech sources
     st.subheader("News Sources")
     selected_sources = st.multiselect(
         "Select sources:",
-        options=["Google News", "BBC News", "Reuters", "CNN", "AP News", "Yahoo News", "TechCrunch", "The Verge", "Ars Technica", "Wired", "Engadget"],
-        default=["Google News", "TechCrunch", "The Verge"]
+        options=["Google News", "BBC News", "Reuters", "CNN", "AP News", "Yahoo News", 
+                "TechCrunch", "The Verge", "Ars Technica", "Wired", "Engadget"],
+        default=["Google News", "TechCrunch", "The Verge"]  # Balanced default selection
     )
     
-    # Search topic
+    # Topic search configuration
     st.subheader("Search Topic")
     topic = st.text_input(
         "Enter the topic you want to analyze:",
-        value="iPhone",
+        value="iPhone",  # Default topic for demonstration
         help="Enter keywords related to the topic you want to search for"
     )
     
-    # Action buttons
+    # Action buttons for main operations
     st.subheader("Actions")
     if st.button("🔍 Scrape & Analyze News", type="primary"):
+        # Input validation
         if not topic.strip():
             st.error("Please enter a topic to search for.")
         else:
             with st.spinner("Scraping news articles..."):
                 try:
-                    # Scrape articles
+                    # Parse comma-separated search terms
                     search_terms = [term.strip() for term in topic.split(",")]
+                    
+                    # Scrape articles from selected sources
                     articles = scraper.scrape_news(
                         search_terms=search_terms,
                         sources=selected_sources,
@@ -127,22 +134,26 @@ with st.sidebar:
                     if articles:
                         st.success(f"Found {len(articles)} articles!")
                         
-                        # Analyze articles
+                        # AI analysis of scraped articles
                         with st.spinner("Analyzing articles with AI..."):
                             analyzed_articles = []
                             progress_bar = st.progress(0)
                             
+                            # Process each article individually with progress tracking
                             for i, article in enumerate(articles):
                                 try:
                                     analysis = analyzer.analyze_article(article)
+                                    # Merge original article data with analysis results
                                     analyzed_articles.append({
                                         **article,
                                         **analysis
                                     })
+                                    # Update progress bar
                                     progress_bar.progress((i + 1) / len(articles))
                                 except Exception as e:
                                     st.error(f"Error analyzing article: {str(e)}")
                             
+                            # Store results in session state for persistence
                             st.session_state.analyzed_articles = analyzed_articles
                             st.session_state.last_update = datetime.now()
                             st.success("Analysis complete!")
@@ -152,21 +163,26 @@ with st.sidebar:
                 except Exception as e:
                     st.error(f"Error during scraping: {str(e)}")
     
+    # Export functionality - only show if we have results
     if st.session_state.analyzed_articles:
         if st.button("📥 Export Results"):
             csv_data = export_to_csv(st.session_state.analyzed_articles)
             st.download_button(
                 label="Download CSV",
                 data=csv_data,
-                file_name=f"php_forex_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                file_name=f"news_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
                 mime="text/csv"
             )
 
-# Main content area
+# ========================================
+# MAIN CONTENT AREA - Results Display
+# ========================================
+
+# Show welcome message and instructions if no results available
 if not st.session_state.analyzed_articles:
     st.info("👆 Use the sidebar to scrape and analyze news on any topic")
     
-    # Show sample instructions
+    # Expandable instructions for new users
     with st.expander("ℹ️ How to use this application"):
         st.markdown("""
         1. **Set Date Range**: Choose the period for news analysis
@@ -177,56 +193,77 @@ if not st.session_state.analyzed_articles:
         6. **Export Data**: Download results as CSV for further analysis
         """)
 else:
-    # Display results
+    # ========================================
+    # RESULTS DASHBOARD - Analysis Display
+    # ========================================
+    
     st.header("📊 Analysis Dashboard")
     
+    # Show timestamp of last analysis
     if st.session_state.last_update:
         st.caption(f"Last updated: {st.session_state.last_update.strftime('%Y-%m-%d %H:%M:%S')}")
     
-    # Summary metrics
+    # ========================================
+    # SUMMARY METRICS - Key Statistics
+    # ========================================
+    
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.metric("Total Articles", len(st.session_state.analyzed_articles))
     with col2:
+        # Count positive sentiment articles
         sentiments = [article.get('sentiment', 'neutral') for article in st.session_state.analyzed_articles]
         positive_count = sentiments.count('positive')
         st.metric("Positive Sentiment", positive_count)
     with col3:
+        # Count negative sentiment articles  
         negative_count = sentiments.count('negative')
         st.metric("Negative Sentiment", negative_count)
     with col4:
+        # Count neutral sentiment articles
         neutral_count = sentiments.count('neutral')
         st.metric("Neutral Sentiment", neutral_count)
     
-    # Overall topic analysis
+    # ========================================
+    # OVERALL ANALYSIS - AI-Generated Summary
+    # ========================================
+    
     st.subheader("🎯 Overall Topic Analysis")
     try:
+        # Generate comprehensive analysis across all articles
         overall_analysis = analyzer.generate_overall_analysis(st.session_state.analyzed_articles)
         st.info(overall_analysis)
     except Exception as e:
         st.error(f"Error generating overall analysis: {str(e)}")
     
-    # Filters for detailed view
+    # ========================================
+    # ARTICLE FILTERING - Interactive Controls
+    # ========================================
+    
     st.subheader("🔍 Detailed Articles")
     
     col1, col2 = st.columns(2)
     with col1:
+        # Filter by sentiment classification
         sentiment_filter = st.selectbox(
             "Filter by sentiment:",
             options=["All", "Positive", "Negative", "Neutral"]
         )
     with col2:
+        # Text search within articles
         search_filter = st.text_input("Search in titles/content:")
     
-    # Filter articles
+    # Apply filters to article list
     filtered_articles = st.session_state.analyzed_articles.copy()
     
+    # Filter by sentiment if not "All"
     if sentiment_filter != "All":
         filtered_articles = [
             article for article in filtered_articles 
             if article.get('sentiment', '').lower() == sentiment_filter.lower()
         ]
     
+    # Filter by search terms if provided
     if search_filter:
         search_lower = search_filter.lower()
         filtered_articles = [
@@ -235,48 +272,60 @@ else:
                search_lower in article.get('content', '').lower()
         ]
     
-    # Display filtered articles
+    # ========================================
+    # ARTICLE DISPLAY - Individual Article Analysis
+    # ========================================
+    
     if filtered_articles:
+        # Display each filtered article in an expandable format
         for i, article in enumerate(filtered_articles):
             with st.expander(f"📰 {article.get('title', 'No Title')}", expanded=False):
                 col1, col2 = st.columns([2, 1])
                 
+                # Left column: Article metadata
                 with col1:
                     st.markdown(f"**Source:** {article.get('source', 'Unknown')}")
                     st.markdown(f"**Published:** {format_date(article.get('published_date'))}")
                     st.markdown(f"**URL:** [{article.get('url', 'N/A')}]({article.get('url', '#')})")
                 
+                # Right column: Sentiment analysis results
                 with col2:
                     sentiment = article.get('sentiment', 'neutral')
+                    # Use colored indicators for sentiment
                     sentiment_color = {
                         'positive': '🟢',
-                        'negative': '🔴',
+                        'negative': '🔴', 
                         'neutral': '🟡'
                     }.get(sentiment, '⚪')
                     st.markdown(f"**Sentiment:** {sentiment_color} {sentiment.title()}")
                     
+                    # Display confidence score
                     confidence = article.get('confidence_score', 0)
                     st.markdown(f"**Confidence:** {confidence:.2f}")
                 
-                # Article summary
+                # AI-generated summary section
                 st.markdown("**AI Summary:**")
                 st.write(article.get('summary', 'No summary available'))
                 
-                # Key insights
+                # Key insights section
                 if article.get('key_insights'):
                     st.markdown("**Key Insights:**")
                     for insight in article.get('key_insights', []):
                         st.write(f"• {insight}")
                 
-                # Original content preview
+                # Optional: Show original content (can be long)
                 if st.checkbox(f"Show original content", key=f"show_content_{i}"):
                     st.markdown("**Original Content:**")
                     content = article.get('content', 'No content available')
+                    # Truncate very long content for display
                     st.text_area("", value=content[:1000] + ("..." if len(content) > 1000 else ""), 
                                height=200, key=f"content_{i}")
     else:
         st.info("No articles match the current filters.")
 
-# Footer
+# ========================================
+# FOOTER - Application Information
+# ========================================
+
 st.markdown("---")
-st.markdown("Built with ❤️ using Streamlit and OpenAI GPT-5 | Analyze any news topic with AI-powered insights")
+st.markdown("Built with ❤️ using Streamlit and OpenAI GPT-4o | Analyze any news topic with AI-powered insights")
