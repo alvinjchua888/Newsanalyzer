@@ -5,9 +5,8 @@ from typing import Dict, Any, List
 
 class LLMAnalyzer:
     def __init__(self):
-        # the newest OpenAI model is "gpt-5" which was released August 7, 2025.
-        # do not change this unless explicitly requested by the user
-        self.model = "gpt-5"
+        # Using gpt-4o for better stability and compatibility
+        self.model = "gpt-4o"
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
             raise ValueError("OPENAI_API_KEY environment variable must be set")
@@ -78,7 +77,7 @@ class LLMAnalyzer:
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[{"role": "user", "content": prompt}],
-                max_completion_tokens=150,
+                max_tokens=150,
                 temperature=0.3
             )
             return response.choices[0].message.content.strip()
@@ -244,7 +243,7 @@ class LLMAnalyzer:
                     },
                     {"role": "user", "content": prompt}
                 ],
-                max_completion_tokens=500,
+                max_tokens=500,
                 temperature=0.4
             )
             return response.choices[0].message.content.strip()
