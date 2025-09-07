@@ -56,6 +56,7 @@ class NewsScraper:
         # Remove duplicates based on title similarity
         articles = self._remove_duplicates(articles)
         
+        print(f"Total articles found after deduplication: {len(articles)}")
         return articles[:max_articles]
     
     def _search_google_news(self, search_query: str, max_articles: int = 10) -> List[Dict[str, Any]]:
