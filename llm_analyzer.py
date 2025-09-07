@@ -16,7 +16,7 @@ class LLMAnalyzer:
     
     def analyze_article(self, article: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Analyze a single news article for Philippine peso forex insights
+        Analyze a single news article for insights on any topic
         """
         content = article.get('content', '')
         title = article.get('title', '')
@@ -62,11 +62,11 @@ class LLMAnalyzer:
     
     def _generate_summary(self, title: str, content: str) -> str:
         """
-        Generate a concise summary of the article focusing on PHP forex aspects
+        Generate a concise summary of the article focusing on key aspects
         """
         prompt = f"""
-        Please provide a concise summary of this Philippine peso forex news article. 
-        Focus on key points related to currency movements, economic factors, and market implications.
+        Please provide a concise summary of this news article. 
+        Focus on the key points, main events, and important implications mentioned in the article.
         
         Title: {title}
         Content: {content[:2000]}...
@@ -87,15 +87,14 @@ class LLMAnalyzer:
     
     def _analyze_sentiment(self, content: str) -> Dict[str, Any]:
         """
-        Analyze sentiment specifically for Philippine peso forex implications
+        Analyze sentiment of the news article for the topic being discussed
         """
         prompt = f"""
-        Analyze the sentiment of this news article regarding the Philippine peso's performance and outlook.
-        Consider factors like:
-        - Currency strength/weakness indicators
-        - Economic policy impacts
-        - Market confidence signals
-        - Future outlook implications
+        Analyze the sentiment of this news article. Consider factors like:
+        - Overall tone (positive, negative, or neutral)
+        - Outlook and implications mentioned
+        - Impact on stakeholders
+        - Future prospects discussed
         
         Content: {content[:2000]}...
         
@@ -109,7 +108,7 @@ class LLMAnalyzer:
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are a financial analyst specializing in Philippine peso forex analysis. Respond only with valid JSON."
+                        "content": "You are a news analyst specializing in sentiment analysis. Respond only with valid JSON."
                     },
                     {"role": "user", "content": prompt}
                 ],
@@ -132,15 +131,15 @@ class LLMAnalyzer:
     
     def _extract_key_insights(self, content: str) -> List[str]:
         """
-        Extract key insights relevant to Philippine peso forex trading
+        Extract key insights from the article relevant to the topic being discussed
         """
         prompt = f"""
-        Extract 3-5 key insights from this article that would be valuable for understanding Philippine peso forex movements.
+        Extract 3-5 key insights from this article that would be valuable for understanding the main topic.
         Focus on:
-        - Specific economic indicators mentioned
-        - Policy changes or announcements
-        - Market driving factors
-        - Technical or fundamental analysis points
+        - Specific facts or data mentioned
+        - Important developments or announcements
+        - Driving factors and trends
+        - Analysis points and expert opinions
         
         Content: {content[:2000]}...
         
@@ -154,7 +153,7 @@ class LLMAnalyzer:
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are a forex analyst. Extract actionable insights about Philippine peso. Respond only with valid JSON."
+                        "content": "You are a news analyst. Extract actionable insights from news articles. Respond only with valid JSON."
                     },
                     {"role": "user", "content": prompt}
                 ],
@@ -169,10 +168,10 @@ class LLMAnalyzer:
     
     def _assess_market_impact(self, content: str) -> str:
         """
-        Assess the potential market impact of the news
+        Assess the potential impact of the news on the topic or relevant stakeholders
         """
         prompt = f"""
-        Assess the potential market impact of this news on Philippine peso trading.
+        Assess the potential impact of this news on the relevant industry, market, or stakeholders.
         
         Content: {content[:1500]}...
         
@@ -187,7 +186,7 @@ class LLMAnalyzer:
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are a market impact analyst. Assess news impact on Philippine peso. Respond only with valid JSON."
+                        "content": "You are a news impact analyst. Assess the impact of news on relevant markets or stakeholders. Respond only with valid JSON."
                     },
                     {"role": "user", "content": prompt}
                 ],
@@ -202,7 +201,7 @@ class LLMAnalyzer:
     
     def generate_overall_analysis(self, analyzed_articles: List[Dict[str, Any]]) -> str:
         """
-        Generate an overall market analysis based on all analyzed articles
+        Generate an overall topic analysis based on all analyzed articles
         """
         if not analyzed_articles:
             return "No articles available for analysis."
@@ -218,7 +217,7 @@ class LLMAnalyzer:
         }
         
         prompt = f"""
-        Based on analysis of {len(analyzed_articles)} recent Philippine peso forex news articles, provide an overall market assessment.
+        Based on analysis of {len(analyzed_articles)} recent news articles, provide an overall topic assessment.
         
         Sentiment Distribution:
         - Positive: {sentiment_counts['positive']} articles
@@ -229,10 +228,10 @@ class LLMAnalyzer:
         {chr(10).join(summaries[:5])}
         
         Provide a comprehensive 3-4 paragraph analysis covering:
-        1. Overall market sentiment and trend direction
-        2. Key factors driving Philippine peso movements
-        3. Outlook and potential risks/opportunities
-        4. Actionable insights for forex traders
+        1. Overall sentiment and trend direction for this topic
+        2. Key factors and developments driving the narrative
+        3. Outlook and potential implications
+        4. Key insights and takeaways
         """
         
         try:
@@ -241,7 +240,7 @@ class LLMAnalyzer:
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are a senior forex analyst specializing in Philippine peso markets. Provide professional, actionable analysis."
+                        "content": "You are a senior news analyst. Provide professional, comprehensive analysis based on multiple news sources."
                     },
                     {"role": "user", "content": prompt}
                 ],
