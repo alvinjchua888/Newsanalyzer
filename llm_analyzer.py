@@ -78,7 +78,7 @@ class LLMAnalyzer:
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[{"role": "user", "content": prompt}],
-                max_tokens=150,
+                max_completion_tokens=150,
                 temperature=0.3
             )
             return response.choices[0].message.content.strip()
@@ -244,7 +244,7 @@ class LLMAnalyzer:
                     },
                     {"role": "user", "content": prompt}
                 ],
-                max_tokens=500,
+                max_completion_tokens=500,
                 temperature=0.4
             )
             return response.choices[0].message.content.strip()
