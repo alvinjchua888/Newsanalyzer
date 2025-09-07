@@ -4,36 +4,51 @@ import trafilatura
 from typing import List, Dict, Any
 import time
 import re
+import urllib.parse
+import xml.etree.ElementTree as ET
+import feedparser
 
 class NewsScraper:
     def __init__(self):
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
-        self.sources = {
-            'Reuters': 'https://www.reuters.com',
-            'Bloomberg': 'https://www.bloomberg.com',
-            'CNN Philippines': 'https://www.cnnphilippines.com',
-            'Rappler': 'https://www.rappler.com',
-            'Inquirer': 'https://www.inquirer.net',
-            'Manila Bulletin': 'https://mb.com.ph'
+        self.rss_sources = {
+            'BBC News': 'http://feeds.bbci.co.uk/news/rss.xml',
+            'Reuters': 'https://www.reutersagency.com/feed/?best-topics=business-finance&post_type=best',
+            'CNN': 'http://rss.cnn.com/rss/edition.rss',
+            'AP News': 'https://rsshub.app/ap/topics/apf-topnews',
+            'Yahoo News': 'https://www.yahoo.com/news/rss',
+            'Google News': 'https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en'
         }
     
     def scrape_news(self, search_terms: List[str], sources: List[str], 
-                   start_date: datetime, end_date: datetime) -> List[Dict[str, Any]]:
+                   start_date: datetime, end_date: datetime, max_articles: int = 20) -> List[Dict[str, Any]]:
         """
-        Scrape news articles from multiple sources
+        Scrape news articles from multiple sources using RSS feeds and Google News search
         """
         articles = []
+        search_query = ' '.join(search_terms)
         
+        # First, try Google News search for specific topics
+        try:
+            google_articles = self._search_google_news(search_query, max_articles // 2)
+            articles.extend(google_articles)
+        except Exception as e:
+            print(f"Error searching Google News: {str(e)}")
+        
+        # Then, search through RSS feeds
         for source in sources:
-            if source not in self.sources:
+            if source not in self.rss_sources:
                 continue
                 
             try:
-                source_articles = self._scrape_source(source, search_terms, start_date, end_date)
+                source_articles = self._scrape_rss_source(source, search_terms, start_date, end_date)
                 articles.extend(source_articles)
                 time.sleep(1)  # Be respectful to servers
+                
+                if len(articles) >= max_articles:
+                    break
             except Exception as e:
                 print(f"Error scraping {source}: {str(e)}")
                 continue
@@ -41,65 +56,93 @@ class NewsScraper:
         # Remove duplicates based on title similarity
         articles = self._remove_duplicates(articles)
         
-        return articles
+        return articles[:max_articles]
     
-    def _scrape_source(self, source: str, search_terms: List[str], 
-                      start_date: datetime, end_date: datetime) -> List[Dict[str, Any]]:
+    def _search_google_news(self, search_query: str, max_articles: int = 10) -> List[Dict[str, Any]]:
         """
-        Scrape articles from a specific source
+        Search Google News for articles matching the query
         """
         articles = []
         
-        # For demonstration, we'll use Google News search for each source
-        # In production, you might want to use specific APIs or RSS feeds
-        search_query = ' OR '.join(search_terms)
-        
-        # Construct Google News search URL
-        google_news_urls = self._get_google_news_urls(search_query, source, start_date, end_date)
-        
-        for url in google_news_urls:
-            try:
-                article_data = self._extract_article_content(url, source)
-                if article_data and self._is_relevant_article(article_data['content'], search_terms):
-                    articles.append(article_data)
-                    
-                if len(articles) >= 10:  # Limit per source
-                    break
-                    
-            except Exception as e:
-                print(f"Error processing URL {url}: {str(e)}")
-                continue
-        
+        try:
+            # Use Google News RSS search
+            encoded_query = urllib.parse.quote_plus(search_query)
+            google_news_url = f"https://news.google.com/rss/search?q={encoded_query}&hl=en-US&gl=US&ceid=US:en"
+            
+            response = requests.get(google_news_url, headers=self.headers, timeout=10)
+            if response.status_code == 200:
+                feed = feedparser.parse(response.content)
+                
+                for entry in feed.entries[:max_articles]:
+                    try:
+                        # Extract the actual article URL from Google News redirect
+                        article_url = self._extract_real_url(entry.link)
+                        if article_url:
+                            article_data = self._extract_article_content(article_url, 'Google News')
+                            if article_data:
+                                articles.append(article_data)
+                                
+                    except Exception as e:
+                        print(f"Error processing Google News entry: {str(e)}")
+                        continue
+                        
+        except Exception as e:
+            print(f"Error searching Google News: {str(e)}")
+            
         return articles
     
-    def _get_google_news_urls(self, query: str, source: str, 
-                             start_date: datetime, end_date: datetime) -> List[str]:
+    def _scrape_rss_source(self, source: str, search_terms: List[str], 
+                          start_date: datetime, end_date: datetime) -> List[Dict[str, Any]]:
         """
-        Get news URLs from Google News search
+        Scrape articles from RSS feeds
         """
-        urls = []
+        articles = []
         
-        # Sample URLs for different sources - in production, use actual search APIs
-        if source == "Reuters":
-            urls = [
-                "https://www.reuters.com/markets/currencies/philippine-peso-weakens-dollar-strength-2024-01-15/",
-                "https://www.reuters.com/markets/currencies/philippine-central-bank-intervenes-support-peso-2024-01-16/",
-                "https://www.reuters.com/world/asia-pacific/philippine-peso-slides-inflation-concerns-2024-01-17/",
-            ]
-        elif source == "Bloomberg":
-            urls = [
-                "https://www.bloomberg.com/news/articles/2024-01-15/philippine-peso-drops-amid-fed-policy-uncertainty",
-                "https://www.bloomberg.com/news/articles/2024-01-16/philippines-forex-reserves-support-peso-stability",
-            ]
-        elif source == "CNN Philippines":
-            urls = [
-                "https://www.cnnphilippines.com/business/2024/1/15/peso-exchange-rate-analysis.html",
-                "https://www.cnnphilippines.com/business/2024/1/16/bsp-monetary-policy-peso.html",
-            ]
-        
-        # Filter URLs to only include those that might have recent content
-        # In a real implementation, you would use proper news APIs or RSS feeds
-        return urls[:5]  # Limit to avoid overwhelming
+        if source not in self.rss_sources:
+            return articles
+            
+        try:
+            rss_url = self.rss_sources[source]
+            response = requests.get(rss_url, headers=self.headers, timeout=10)
+            
+            if response.status_code == 200:
+                feed = feedparser.parse(response.content)
+                
+                for entry in feed.entries[:10]:  # Limit per source
+                    try:
+                        article_data = self._extract_article_content(entry.link, source)
+                        if article_data and self._is_relevant_article(article_data['content'], search_terms):
+                            articles.append(article_data)
+                            
+                    except Exception as e:
+                        print(f"Error processing RSS entry: {str(e)}")
+                        continue
+                        
+        except Exception as e:
+            print(f"Error fetching RSS from {source}: {str(e)}")
+            
+        return articles
+    
+    def _extract_real_url(self, google_news_url: str) -> str:
+        """
+        Extract the real article URL from Google News redirect URL
+        """
+        try:
+            # Google News URLs often contain the real URL in the query parameters
+            if 'url=' in google_news_url:
+                # Extract URL parameter
+                url_start = google_news_url.find('url=') + 4
+                url_end = google_news_url.find('&', url_start)
+                if url_end == -1:
+                    url_end = len(google_news_url)
+                real_url = urllib.parse.unquote(google_news_url[url_start:url_end])
+                return real_url
+            else:
+                # If it's already a direct URL, return as is
+                return google_news_url
+        except Exception as e:
+            print(f"Error extracting real URL: {str(e)}")
+            return google_news_url
     
     def _extract_article_content(self, url: str, source: str) -> Dict[str, Any]:
         """
@@ -151,18 +194,19 @@ class NewsScraper:
         """
         Check if article content is relevant to our search terms
         """
+        if not content or len(content) < 100:
+            return False
+            
         content_lower = content.lower()
         
         # Must contain at least one search term
+        relevance_score = 0
         for term in search_terms:
             if term.lower() in content_lower:
-                return True
+                relevance_score += 1
         
-        # Additional relevance checks for Philippine peso forex news
-        forex_keywords = ['peso', 'php', 'exchange rate', 'currency', 'dollar', 'forex', 'bangko sentral']
-        relevant_count = sum(1 for keyword in forex_keywords if keyword in content_lower)
-        
-        return relevant_count >= 2
+        # Consider article relevant if it contains any search term
+        return relevance_score > 0
     
     def _remove_duplicates(self, articles: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
